@@ -9,6 +9,10 @@ services:
     networks:
       - bookstore-net
     environment:
+      PORT: 8080
+      GIN_MODE: "debug"
+      TOKEN_EXPIRY: "24h"
+      ALLOWED_ORIGIN: "*"  
       BOOKSTORE_SERVICE_URL: http://bookstore:5000
       ORDER_SERVICE_URL: http://bookstore-order-app1:8000
 
