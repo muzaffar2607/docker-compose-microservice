@@ -1,0 +1,91 @@
+
+services:
+  api-gateway:
+    container_name: bookstore-api-gateway-app1
+    image: bookstore-api-gateway:v1
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    networks:
+      - bookstore-net
+    environment:
+      BOOKSTORE_SERVICE_URL: http://bookstore:5000
+      ORDER_SERVICE_URL: http://bookstore-order-app1:8000
+
+  postgres-db:
+    container_name: bookstore-postgres-db1
+    restart: always
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=MySecretPass
+      - POSTGRES_DB=bookstore_db
+    volumes:
+      - ./db_data:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    networks:
+      - bookstore-net
+
+  bookstore:
+    container_name: bookstore-app1
+    image: bookstore:v1
+    restart: on-failure
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres-db
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://myuser:MySecretPass@bookstore-postgres-db1:5432/bookstore_db
+      - SECRET_KEY=secret_key
+      - DEBUG=True
+    command: sh -c "flask run --host 0.0.0.0 --port 5000 --reload"    
+    networks:
+      - bookstore-net
+
+  mongodb:
+    image: mongo:7
+    container_name: bookstore-order-svc-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: bookstore
+      MONGO_INITDB_ROOT_PASSWORD: secretPass
+      MONGO_INITDB_DATABASE: bookstore
+    volumes:
+      - mongodb_data:/data/db
+
+    networks:
+      - bookstore-net
+
+  bookstore-order-svc:
+    container_name: bookstore-order-app1
+    image: bookstore-order-svc:v1
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URL: mongodb://bookstore:secretPass@bookstore-order-svc-mongodb:27017/bookstore?authSource=admin
+      DATABASE_NAME: "bookstore-orders"
+      SECRET_KEY: "1234"
+      DEBUG: True
+      BOOK_SERVICE_URL: http://bookstore:5000
+
+    depends_on:
+      - mongodb
+    volumes:
+      - ./bookstore-order-svc/app:/app
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    networks:
+      - bookstore-net
+
+volumes:
+  db_data:
+  app:
+  mongodb_data:
+
+networks:
+  bookstore-net:
+    driver: bridge
